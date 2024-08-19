@@ -34,7 +34,6 @@ class Mapper:
         weights = torch.load(model_weights_path, map_location=self.device)
         self.model = resnet18(weights=weights, dilation=[1, 2, 2])
         self.model.to(self.device)
-        self.model.eval()
 
         full_court = cv2.imread(court_image_path)
         court_image_width, court_image_height = full_court.shape[1], full_court.shape[0]
@@ -42,6 +41,8 @@ class Mapper:
         self.field_points = getFieldPoints(
             scaled_width=court_image_width, scaled_height=court_image_height
         )
+
+        self.last_h = None
 
     def __call__(self, frame: np.ndarray):
         """
@@ -100,8 +101,10 @@ class Mapper:
                 dst_points.append(self.field_points[j])
 
         if len(src_points) < 4 or len(dst_points) < 4:
-            Logger.warning("Not enough points to calculate homography matrix.")
-            return None
+            Logger.warning(
+                "Not enough points to calculate homography matrix. Using last homography matrix."
+            )
+            return self.last_h
 
         h = cv2.findHomography(
             srcPoints=np.array(src_points, dtype=np.float32),
@@ -110,5 +113,7 @@ class Mapper:
             ransacReprojThreshold=35.0,
             maxIters=2000,
         )[0]
+
+        self.last_h = h
 
         return h
