@@ -31,7 +31,6 @@ class ReID:
         self.model = ImageClip(model_name=model_name, pretrained=pretrained)
         self.model.load_state_dict(state_dict=weights)
         self.model.to(self.device)
-        self.model.eval()
 
         # Initialize tracklets, a dictionary to store the features of detected basketball players.
         self.tracklets: dict[int, torch.Tensor] = {}
@@ -49,7 +48,7 @@ class ReID:
         with torch.no_grad():
             for i, img in enumerate(images):
                 img = img.to(self.device)
-                self.tracklets[i] = self.model(img).detach()
+                self.tracklets[i] = self.model(img).detach().cpu()
 
     def add_tracklet(self, image: torch.Tensor) -> None:
         """
@@ -63,7 +62,7 @@ class ReID:
         """
         with torch.no_grad():
             image = image.to(self.device)
-            self.tracklets[len(self.tracklets)] = self.model(image).detach()
+            self.tracklets[len(self.tracklets)] = self.model(image).detach().cpu()
 
     def update_tracklet(self, best_matches: dict[int, int], images: list[torch.Tensor]):
         """
@@ -77,9 +76,9 @@ class ReID:
             None
         """
         for query_idx, gallery_idx in best_matches.items():
-            self.tracklets[query_idx] = self.model(
-                images[gallery_idx].to(self.device)
-            ).detach()
+            self.tracklets[query_idx] = (
+                self.model(images[gallery_idx].to(self.device)).detach().cpu()
+            )
 
         # check for edge cases
         # When there are fewer detections in the current frame than the previous frame,
@@ -89,7 +88,7 @@ class ReID:
         # When there are more detections in the current frame than the previous frame,
         # i.e. len(images) > len(self.tracklets)
         # Add the new detections as tracklets.
-        if len(images) > len(self.tracklets):
+        if len(images) > len(self.tracklets) and len(self.tracklets) < 10:
             for i in range(len(images)):
                 if i not in best_matches.values():
                     self.add_tracklet(images[i])
@@ -108,7 +107,7 @@ class ReID:
         with torch.no_grad():
             for img in images:
                 img = img.to(self.device)
-                feature = self.model(img)
+                feature = self.model(img).detach().cpu()
                 images_features.append(feature)
         distance_mat_q_g = pairwise_distance(
             query_features=list(self.tracklets.values()),
