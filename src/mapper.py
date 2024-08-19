@@ -43,9 +43,6 @@ class Mapper:
             scaled_width=court_image_width, scaled_height=court_image_height
         )
 
-        self.src_points = []
-        self.dst_points = []
-
     def __call__(self, frame: np.ndarray):
         """
         Get the homography matrix from the input frame.
@@ -56,6 +53,9 @@ class Mapper:
         Returns:
             np.ndarray: Homography matrix.
         """
+        src_points = []
+        dst_points = []
+
         frame_height, frame_width = frame.shape[:2]
 
         tf = transforms.Compose(
@@ -78,6 +78,7 @@ class Mapper:
             """
             Source: https://github.com/CEA-LIST/KaliCalib/blob/main/kalicalib/estimateHomography.py
             """
+            src_points, dst_points = [], []
 
             pixelScores = np.swapaxes(model_output, 0, 2)
             pixelMaxScores = np.max(pixelScores, axis=2, keepdims=2)
@@ -95,16 +96,16 @@ class Mapper:
                     [frame_height / 135, frame_height / 135]
                 )  # scale up to original image size
 
-                self.src_points.append(p[::-1])
-                self.dst_points.append(self.field_points[j])
+                src_points.append(p[::-1])
+                dst_points.append(self.field_points[j])
 
-        if len(self.src_points) < 4 or len(self.dst_points) < 4:
+        if len(src_points) < 4 or len(dst_points) < 4:
             Logger.warning("Not enough points to calculate homography matrix.")
             return None
 
         h = cv2.findHomography(
-            srcPoints=np.array(self.src_points, dtype=np.float32),
-            dstPoints=np.array(self.dst_points, dtype=np.float32),
+            srcPoints=np.array(src_points, dtype=np.float32),
+            dstPoints=np.array(dst_points, dtype=np.float32),
             method=cv2.RANSAC,
             ransacReprojThreshold=35.0,
             maxIters=2000,
