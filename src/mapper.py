@@ -44,7 +44,7 @@ class Mapper:
 
         self.last_h = None
 
-    def __call__(self, frame: np.ndarray):
+    def __call__(self, frame: np.ndarray) -> np.ndarray:
         """
         Get the homography matrix from the input frame.
 
