@@ -112,7 +112,7 @@ class ReID:
         gallery_features = (
             self.model(torch.stack(images).squeeze().to(self.device)).detach().cpu()
         )
-        query_features = torch.stack(list(self.tracklets.values())).to(self.device)
+        query_features = torch.stack(list(self.tracklets.values())).detach().cpu()
 
         distance_mat_q_g = pairwise_distance(
             query_features=query_features,
