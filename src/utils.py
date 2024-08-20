@@ -59,23 +59,19 @@ def find_midpoint_lower_side(xywh: np.ndarray) -> np.ndarray:
 
 
 def pairwise_distance(
-    query_features: list[torch.Tensor], gallery_features: list[torch.Tensor]
+    query_features: torch.Tensor, gallery_features: torch.Tensor
 ) -> torch.Tensor:
     """Calculate the pairwise distance between query and gallery features.
 
     Args:
-        query_features (list[torch.Tensor]): Query features.
-        gallery_features (list[torch.Tensor]): Gallery features.
+        query_features (torch.Tensor): Query features.
+        gallery_features (torch.Tensor): Gallery features
 
     Returns:
         torch.Tensor: Pairwise distance between query and gallery features.
     """
-    query_features = torch.cat(query_features, dim=0)
-    gallery_features = torch.cat(gallery_features, dim=0)
     number_of_query = query_features.size(0)
     number_of_gallery = gallery_features.size(0)
-    query_features = query_features.view(number_of_query, -1)
-    gallery_features = gallery_features.view(number_of_gallery, -1)
 
     dist = (
         torch.pow(query_features, 2)
