@@ -1,5 +1,10 @@
+from typing import Callable
+
+import cv2
 import numpy as np
 import torch
+from PIL import Image
+from torchvision import transforms
 
 from .constants import FIELD_HEIGHT, FIELD_WIDTH
 
@@ -219,3 +224,57 @@ def get_matches_from_reranked_distance_mat(distance_mat: np.ndarray) -> dict[int
             distance_mat[row, col] = np.inf
 
     return best_matches
+
+
+def crop_bbox_from_image(
+    image: np.ndarray, bboxes: np.ndarray, preprocess: Callable | None = None
+) -> list[torch.Tensor | np.ndarray]:
+    """Crop bounding boxes from the image and preprocess them.
+
+    Args:
+        image (np.ndarray): Path to the image.
+        bboxes (np.ndarray): Bounding boxes.
+        preprocess (Callable): Preprocessing function.
+
+    Returns:
+        list[torch.Tensor]: List of cropped and preprocessed bounding boxes.
+    """
+    cropped_images = []
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    # Convert the image to PIL format
+    image = Image.fromarray(image)
+    for bbox in bboxes:
+        x, y, w, h = bbox
+        cropped_image = image.crop((x, y, x + w, y + h))
+        if preprocess:
+            cropped_image = preprocess(cropped_image)
+        cropped_images.append(cropped_image.unsqueeze(0))
+    return cropped_images
+
+
+def pad_to_square(image, fill=0) -> Image.Image:
+    """
+    Pad the input image to make it square.
+
+    Args:
+        image (PIL.Image): Input image.
+        fill (int): Fill value for padding.
+
+    Returns:
+        PIL.Image: Padded image.
+    """
+    width, height = image.size
+    if width == height:
+        return image
+
+    max_side = max(width, height)
+    padding = (
+        (max_side - width) // 2,  # left
+        (max_side - height) // 2,  # top
+        (max_side - width + 1) // 2,  # right
+        (max_side - height + 1) // 2,  # bottom
+    )
+    padded_image = transforms.functional.pad(
+        image, padding, fill=fill, padding_mode="constant"
+    )
+    return padded_image
