@@ -108,7 +108,7 @@ class Visualizer:
             )[0]
             detected_player_images = crop_bbox_from_image(
                 image=frame,
-                bboxes=self.tracker.model(frame)[0].boxes.xywh.cpu().numpy(),
+                bboxes=self.tracker.model_results.boxes.xywh.cpu().numpy(),
                 preprocess=self.reid_preprocess,
             )
 

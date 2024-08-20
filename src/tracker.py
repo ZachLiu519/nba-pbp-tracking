@@ -29,6 +29,7 @@ class Tracker:
         self.model = YOLO(model_weights_path)
         self.model.conf = confidence_threshold
         self.model.iou = overlap_threshold
+        self.model_results = None
 
     def __call__(self, frame: np.ndarray) -> np.ndarray:
         """
@@ -40,7 +41,8 @@ class Tracker:
         Returns:
             np.ndarray: Coordinates of the basketball players in the frame.
         """
-        boxes = self.model(frame)[0].boxes
+        self.model_results = self.model(frame)[0]
+        boxes = self.model_results.boxes
         positions = find_midpoint_lower_side(xywh=boxes.xywh.cpu().numpy())
 
         return positions
