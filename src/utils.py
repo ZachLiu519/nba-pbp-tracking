@@ -240,11 +240,14 @@ def crop_bbox_from_image(
     # Convert the image to PIL format
     image = Image.fromarray(image)
     for bbox in bboxes:
-        x, y, w, h = bbox
-        cropped_image = image.crop((x, y, x + w, y + h))
+        x1, y1, x2, y2 = bbox
+        cropped_image = image.crop((x1, y1, x2, y2))
         if preprocess:
             cropped_image = preprocess(cropped_image)
-        cropped_images.append(cropped_image.unsqueeze(0))
+        if isinstance(cropped_image, torch.Tensor):
+            cropped_images.append(cropped_image.unsqueeze(0))
+        else:
+            cropped_images.append(cropped_image)
     return cropped_images
 
 
