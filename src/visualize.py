@@ -10,7 +10,7 @@ from tqdm import tqdm
 from .mapper import Mapper
 from .reid import ReID
 from .tracker import Tracker
-from .utils import crop_bbox_from_image, pad_to_square
+from .utils import check_valid_movements, crop_bbox_from_image, pad_to_square
 
 
 class Visualizer:
@@ -114,12 +114,21 @@ class Visualizer:
 
             if i == 0:
                 self.reid.setup_tracklet(images=detected_player_images)
+                self.tracker.set_positions_cache(positions=positions)
             else:
-                best_matches, gallery_features = self.reid.reidentify(
-                    images=detected_player_images
+                best_matches, suboptimal_matches, gallery_features = (
+                    self.reid.reidentify(images=detected_player_images)
+                )
+                check_valid_movements(
+                    best_matches=best_matches,
+                    previous_positions=self.tracker.positions_cache,
+                    current_positions=positions,
                 )
                 self.reid.update_tracklet(
                     best_matches=best_matches, gallery_features=gallery_features
+                )
+                self.tracker.update_positions_cache(
+                    best_matches=best_matches, new_positions=positions
                 )
 
             for idx, point in enumerate(projected_positions):
@@ -163,6 +172,12 @@ class Visualizer:
                         )
 
             out.write(full_court_image_to_plot)
+            cv2.imwrite(
+                "/home/zachliu/Scripts/nba-pbp-tracking/src/assets/images/video_output/frame_{}.png".format(
+                    i
+                ),
+                full_court_image_to_plot,
+            )
 
         cap.release()
         out.release()

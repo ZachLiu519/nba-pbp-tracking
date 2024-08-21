@@ -5,7 +5,7 @@ ReID instance to re identify basketball players detected between video frames.
 import torch
 
 from .reid_model.image_clip import ImageClip
-from .utils import get_matches_from_reranked_distance_mat, pairwise_distance, re_ranking
+from .utils import get_matches_with_suboptimal, pairwise_distance, re_ranking
 
 
 class ReID:
@@ -98,7 +98,7 @@ class ReID:
 
     def reidentify(
         self, images: list[torch.Tensor]
-    ) -> tuple[dict[int, int], torch.Tensor]:
+    ) -> tuple[dict[int, int], dict[int, int], torch.Tensor]:
         """
         Reidentify basketball players detected between video frames.
 
@@ -131,6 +131,9 @@ class ReID:
             g_g_dist=distance_mat_g_g,
         )
 
-        best_matches = get_matches_from_reranked_distance_mat(distance_matrix_reranked)
+        # best_matches = get_matches_from_reranked_distance_mat(distance_matrix_reranked)
+        best_matches, suboptimal_matches = get_matches_with_suboptimal(
+            distance_matrix_reranked
+        ).values()
 
-        return best_matches, gallery_features
+        return best_matches, suboptimal_matches, gallery_features

@@ -1,3 +1,4 @@
+import math
 from typing import Callable
 
 import cv2
@@ -222,6 +223,50 @@ def get_matches_from_reranked_distance_mat(distance_mat: np.ndarray) -> dict[int
     return best_matches
 
 
+def get_matches_with_suboptimal(distance_mat: np.ndarray) -> dict[str, dict[int, int]]:
+    """Get the best and suboptimal matches from the reranked distance matrix.
+
+    Args:
+        distance_mat (np.ndarray): Distance matrix.
+
+    Returns:
+        dict[str, dict[int, int]]: Best and suboptimal matches.
+    """
+    best_matches = {}
+    suboptimal_matches = {}
+
+    while distance_mat.min() < np.inf:
+        min_indices = np.unravel_index(
+            np.argmin(distance_mat, axis=None), distance_mat.shape
+        )
+
+        row, col = min_indices
+
+        if (np.argmin(distance_mat[:, col]) == row) and (
+            np.argmin(distance_mat[row, :]) == col
+        ):
+            best_matches[row] = col
+
+            # Find the next best (suboptimal) match for this row
+            distance_mat[row, col] = (
+                np.inf
+            )  # Temporarily set to inf to find the next minimum
+            next_best_col = np.argmin(distance_mat[row, :])
+            suboptimal_matches[row] = next_best_col
+
+            # Revert the distance for the current best match
+            distance_mat[row, col] = np.inf
+
+            # Set the row and column to inf to ensure one-to-one matching
+            distance_mat[row, :] = np.inf
+            distance_mat[:, col] = np.inf
+        else:
+            # In case of no mutual best match, set this cell to inf
+            distance_mat[row, col] = np.inf
+
+    return {"best_matches": best_matches, "suboptimal_matches": suboptimal_matches}
+
+
 def crop_bbox_from_image(
     image: np.ndarray, bboxes: np.ndarray, preprocess: Callable | None = None
 ) -> list[torch.Tensor | np.ndarray]:
@@ -277,3 +322,60 @@ def pad_to_square(image, fill=0) -> Image.Image:
         image, padding, fill=fill, padding_mode="constant"
     )
     return padded_image
+
+
+def check_valid_movements(
+    best_matches: dict[int, int],
+    previous_positions: np.ndarray,
+    current_positions: np.ndarray,
+):
+    # TODO: Productionize this function
+    for query_idx, gallery_idx in best_matches.items():
+        real_distance = calculate_real_distance(
+            1600, 851, previous_positions[query_idx], current_positions[gallery_idx]
+        )
+        if real_distance > 2.0:
+            # assume athletes top speed is 10 m/s, which is 32.8 ft/s, 1 frame in a 60 fps video is 1/60 s
+            # so within 1 frame, the maximum distance is 32.8/60 = 0.5467 ft
+            print(
+                query_idx,
+                gallery_idx,
+                previous_positions[query_idx],
+                current_positions[gallery_idx],
+                real_distance,
+            )
+
+
+def calculate_real_distance(
+    canvas_width: int, canvas_height: int, coord1: tuple, coord2: tuple
+) -> float:
+    """
+    Calculate the real-world distance of movement on a basketball court.
+
+    Args:
+        canvas_width (int): The width of the canvas.
+        canvas_height (int): The height of the canvas.
+        coord1 (tuple): The (x, y) coordinates of the player in the first frame.
+        coord2 (tuple): The (x, y) coordinates of the player in the second frame.
+
+    Returns:
+        float: The real-world distance in feet.
+    """
+
+    # Real dimensions of a basketball court
+    real_court_length = 94.0  # feet
+    real_court_width = 50.0  # feet
+
+    # Calculate the scale factors for x and y coordinates
+    scale_x = real_court_length / canvas_width
+    scale_y = real_court_width / canvas_height
+
+    # Calculate the pixel distance between the two points
+    pixel_distance = math.sqrt(
+        (coord2[0] - coord1[0]) ** 2 + (coord2[1] - coord1[1]) ** 2
+    )
+
+    # Scale the pixel distance to real-world distance
+    real_distance = pixel_distance * math.sqrt(scale_x**2 + scale_y**2)
+
+    return real_distance
