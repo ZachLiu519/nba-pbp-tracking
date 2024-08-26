@@ -223,50 +223,6 @@ def get_matches_from_reranked_distance_mat(distance_mat: np.ndarray) -> dict[int
     return best_matches
 
 
-def get_matches_with_suboptimal(distance_mat: np.ndarray) -> dict[str, dict[int, int]]:
-    """Get the best and suboptimal matches from the reranked distance matrix.
-
-    Args:
-        distance_mat (np.ndarray): Distance matrix.
-
-    Returns:
-        dict[str, dict[int, int]]: Best and suboptimal matches.
-    """
-    best_matches = {}
-    suboptimal_matches = {}
-
-    while distance_mat.min() < np.inf:
-        min_indices = np.unravel_index(
-            np.argmin(distance_mat, axis=None), distance_mat.shape
-        )
-
-        row, col = min_indices
-
-        if (np.argmin(distance_mat[:, col]) == row) and (
-            np.argmin(distance_mat[row, :]) == col
-        ):
-            best_matches[row] = col
-
-            # Find the next best (suboptimal) match for this row
-            distance_mat[row, col] = (
-                np.inf
-            )  # Temporarily set to inf to find the next minimum
-            next_best_col = np.argmin(distance_mat[row, :])
-            suboptimal_matches[row] = next_best_col
-
-            # Revert the distance for the current best match
-            distance_mat[row, col] = np.inf
-
-            # Set the row and column to inf to ensure one-to-one matching
-            distance_mat[row, :] = np.inf
-            distance_mat[:, col] = np.inf
-        else:
-            # In case of no mutual best match, set this cell to inf
-            distance_mat[row, col] = np.inf
-
-    return {"best_matches": best_matches, "suboptimal_matches": suboptimal_matches}
-
-
 def crop_bbox_from_image(
     image: np.ndarray, bboxes: np.ndarray, preprocess: Callable | None = None
 ) -> list[torch.Tensor | np.ndarray]:

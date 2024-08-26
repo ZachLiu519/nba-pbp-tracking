@@ -4,13 +4,14 @@ Visualizer instance to plot the locations of the basketball players on the court
 
 import cv2
 import numpy as np
+import torch
 from torchvision import transforms
 from tqdm import tqdm
 
 from .mapper import Mapper
 from .reid import ReID
 from .tracker import Tracker
-from .utils import check_valid_movements, crop_bbox_from_image, pad_to_square
+from .utils import crop_bbox_from_image, pad_to_square
 
 
 class Visualizer:
@@ -108,7 +109,13 @@ class Visualizer:
             )[0]
             detected_player_images = crop_bbox_from_image(
                 image=frame,
-                bboxes=self.tracker.model_results.boxes.xyxy.cpu().numpy(),
+                bboxes=self.tracker.model_results.boxes.xyxy[
+                    torch.where(
+                        self.tracker.model_results.boxes.cls == 0
+                    )  # 0 is the class label for players
+                ]
+                .cpu()
+                .numpy(),
                 preprocess=self.reid_preprocess,
             )
 
@@ -116,13 +123,12 @@ class Visualizer:
                 self.reid.setup_tracklet(images=detected_player_images)
                 self.tracker.set_positions_cache(positions=positions)
             else:
-                best_matches, suboptimal_matches, gallery_features = (
-                    self.reid.reidentify(images=detected_player_images)
+                position_distance_matrix = self.tracker.get_position_distance_matrix(
+                    current_positions=positions
                 )
-                check_valid_movements(
-                    best_matches=best_matches,
-                    previous_positions=self.tracker.positions_cache,
-                    current_positions=positions,
+                best_matches, gallery_features = self.reid.reidentify(
+                    images=detected_player_images,
+                    position_distance_matrix=position_distance_matrix,
                 )
                 self.reid.update_tracklet(
                     best_matches=best_matches, gallery_features=gallery_features
@@ -172,12 +178,6 @@ class Visualizer:
                         )
 
             out.write(full_court_image_to_plot)
-            cv2.imwrite(
-                "/home/zachliu/Scripts/nba-pbp-tracking/src/assets/images/video_output/frame_{}.png".format(
-                    i
-                ),
-                full_court_image_to_plot,
-            )
 
         cap.release()
         out.release()

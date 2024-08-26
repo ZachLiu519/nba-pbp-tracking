@@ -5,7 +5,7 @@ Tracker instance that tracks the basketball players on the court and returns the
 import numpy as np
 from ultralytics import YOLO
 
-from .utils import find_midpoint_lower_side
+from .utils import calculate_real_distance, find_midpoint_lower_side
 
 
 class Tracker:
@@ -87,3 +87,27 @@ class Tracker:
             for i in range(len(new_positions)):
                 if i not in best_matches.values():
                     self.positions_cache[i] = new_positions[i]
+
+    def get_position_distance_matrix(self, current_positions: np.ndarray) -> np.ndarray:
+        """
+        Return the distance matrix between all pairs of the current and previous positions.
+
+        Args:
+            current_positions (np.ndarray): Current positions.
+
+        Returns:
+            np.ndarray: Distance matrix between all pairs of the current and previous positions.
+        """
+        distance_matrix = np.zeros(
+            (len(current_positions), len(self.positions_cache)), dtype=np.float32
+        )
+        for i, current_position in enumerate(current_positions):
+            for j, previous_position in self.positions_cache.items():
+                distance_matrix[i, j] = calculate_real_distance(
+                    canvas_width=1600,
+                    canvas_height=851,
+                    coord1=current_position,
+                    coord2=previous_position,
+                )
+
+        return distance_matrix
