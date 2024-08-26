@@ -81,8 +81,8 @@ class ReID:
         Returns:
             None
         """
-        for query_idx, gallery_idx in best_matches.items():
-            self.tracklets[query_idx] = gallery_features[gallery_idx]
+        # for query_idx, gallery_idx in best_matches.items():
+        #     self.tracklets[query_idx] = gallery_features[gallery_idx]
 
         # check for edge cases
         # When there are fewer detections in the current frame than the previous frame,
