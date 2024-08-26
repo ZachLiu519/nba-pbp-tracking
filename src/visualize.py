@@ -2,9 +2,12 @@
 Visualizer instance to plot the locations of the basketball players on the court and track their identities.
 """
 
+from collections import Counter, defaultdict
+
 import cv2
 import numpy as np
 import torch
+from open_clip import create_model_from_pretrained, get_tokenizer
 from torchvision import transforms
 from tqdm import tqdm
 
@@ -72,6 +75,13 @@ class Visualizer:
             ]
         )
 
+        self.clip_model = create_model_from_pretrained("ViT-B/16", "openai")
+        self.tokenizer = get_tokenizer("ViT-B-16")
+
+        self.projected_positions = []
+        self.gallery_features = defaultdict(list)
+        self.player_jersey_number_color_map = {}
+
     def __call__(self, video_path: str, output_path: str) -> None:
         """
         Plot the locations of the basketball players on the court and track their identities, then save the output video.
@@ -137,47 +147,114 @@ class Visualizer:
                     best_matches=best_matches, new_positions=positions
                 )
 
-            for idx, point in enumerate(projected_positions):
-                if i == 0:
-                    cv2.circle(
-                        full_court_image_to_plot,
-                        tuple(map(int, point)),
-                        10,
-                        (0, 255, 0),
-                        -1,
-                    )
-                    cv2.putText(
-                        full_court_image_to_plot,
-                        str(idx),
-                        (int(point[0]) + 10, int(point[1]) - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        1,
-                        (0, 128, 255),
-                        2,
-                        cv2.LINE_AA,
-                    )
-                else:
-                    gallery_to_query = {v: k for k, v in best_matches.items()}
-                    if idx in gallery_to_query:
-                        cv2.circle(
-                            full_court_image_to_plot,
-                            tuple(map(int, point)),
-                            10,
-                            (0, 255, 0),
-                            -1,
-                        )
-                        cv2.putText(
-                            full_court_image_to_plot,
-                            str(gallery_to_query[idx]),
-                            (int(point[0]) + 10, int(point[1]) - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            1,
-                            (0, 128, 255),
-                            2,
-                            cv2.LINE_AA,
-                        )
+            if i == 0:
+                self.projected_positions.append(
+                    {idx: point for idx, point in enumerate(projected_positions)}
+                )
+            else:
+                gallery_to_query = {v: k for k, v in best_matches.items()}
+                self.projected_positions.append(
+                    {
+                        gallery_to_query[idx]: point
+                        for idx, point in enumerate(projected_positions)
+                    }
+                )
 
-            out.write(full_court_image_to_plot)
+            for idx, gallery_feature in enumerate(gallery_features):
+                self.gallery_features[idx].append(gallery_feature)
+
+            # for idx, point in enumerate(projected_positions):
+            #     if i == 0:
+            #         cv2.circle(
+            #             full_court_image_to_plot,
+            #             tuple(map(int, point)),
+            #             10,
+            #             (0, 255, 0),
+            #             -1,
+            #         )
+            #         cv2.putText(
+            #             full_court_image_to_plot,
+            #             str(idx),
+            #             (int(point[0]) + 10, int(point[1]) - 10),
+            #             cv2.FONT_HERSHEY_SIMPLEX,
+            #             1,
+            #             (0, 128, 255),
+            #             2,
+            #             cv2.LINE_AA,
+            #         )
+            #     else:
+            #         gallery_to_query = {v: k for k, v in best_matches.items()}
+            #         if idx in gallery_to_query:
+            #             cv2.circle(
+            #                 full_court_image_to_plot,
+            #                 tuple(map(int, point)),
+            #                 10,
+            #                 (0, 255, 0),
+            #                 -1,
+            #             )
+            #             cv2.putText(
+            #                 full_court_image_to_plot,
+            #                 str(gallery_to_query[idx]),
+            #                 (int(point[0]) + 10, int(point[1]) - 10),
+            #                 cv2.FONT_HERSHEY_SIMPLEX,
+            #                 1,
+            #                 (0, 128, 255),
+            #                 2,
+            #                 cv2.LINE_AA,
+            #             )
+            # out.write(full_court_image_to_plot)
 
         cap.release()
         out.release()
+
+    def get_jersey_number_color(self):
+        colors = [
+            "red",
+            "blue",
+            "green",
+            "yellow",
+            "black",
+            "white",
+            "grey",
+            "orange",
+        ]
+        number_text = self.tokenizer(
+            [f"a basketball player with jersey number {i}" for i in range(100)]
+        )
+        color_text = self.tokenizer([f"a {i} jersey, color {i}" for i in colors])
+
+        with torch.no_grad(), torch.cuda.amp.autocast():
+            number_text_features = self.clip_model.encode_text(number_text)
+            number_text_features /= number_text_features.norm(dim=-1, keepdim=True)
+
+            color_text_features = self.clip_model.encode_text(color_text)
+            color_text_features /= color_text_features.norm(dim=-1, keepdim=True)
+
+            for idx, gallery_features in self.gallery_features.items():
+                number_labels = []
+                color_labels = []
+                gallery_features = torch.stack(gallery_features)
+                gallery_features = self.clip_model.encode_image(gallery_features)
+                for gallery_feature in gallery_features:
+                    gallery_feature /= gallery_feature.norm(dim=-1, keepdim=True)
+
+                    number_text_probs = (
+                        100.0 * gallery_feature @ number_text_features.T
+                    ).softmax(dim=-1)
+
+                    color_text_probs = (
+                        100.0 * gallery_feature @ color_text_features.T
+                    ).softmax(dim=-1)
+
+                    if number_text_probs.var() > 1e-4:
+                        number_labels.append(number_text_probs.argmax())
+
+                    color_labels.append(color_text_probs.argmax())
+
+                number_labels_counter = Counter(number_labels)
+                color_labels_counter = Counter(color_labels)
+
+                self.player_jersey_number_color_map[idx] = (
+                    max(number_labels_counter, key=number_labels_counter.get),
+                    max(color_labels_counter, key=color_labels_counter.get),
+                )
