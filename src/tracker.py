@@ -3,6 +3,7 @@ Tracker instance that tracks the basketball players on the court and returns the
 """
 
 import numpy as np
+import torch
 from ultralytics import YOLO
 
 from .utils import calculate_real_distance, find_midpoint_lower_side
@@ -45,8 +46,15 @@ class Tracker:
             np.ndarray: Coordinates of the basketball players in the frame.
         """
         self.model_results = self.model(frame)[0]
-        boxes = self.model_results.boxes
-        positions = find_midpoint_lower_side(xywh=boxes.xywh.cpu().numpy())
+        positions = find_midpoint_lower_side(
+            xywh=self.model_results.boxes.xywh[
+                torch.where(
+                    self.model_results.boxes.cls == 0
+                )  # 0 is the class label for players
+            ]
+            .cpu()
+            .numpy()
+        )
 
         return positions
 
@@ -99,10 +107,10 @@ class Tracker:
             np.ndarray: Distance matrix between all pairs of the current and previous positions.
         """
         distance_matrix = np.zeros(
-            (len(current_positions), len(self.positions_cache)), dtype=np.float32
+            (len(self.positions_cache), len(current_positions)), dtype=np.float32
         )
-        for i, current_position in enumerate(current_positions):
-            for j, previous_position in self.positions_cache.items():
+        for i, previous_position in self.positions_cache.items():
+            for j, current_position in enumerate(current_positions):
                 distance_matrix[i, j] = calculate_real_distance(
                     canvas_width=1600,
                     canvas_height=851,
