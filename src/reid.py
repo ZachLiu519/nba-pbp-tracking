@@ -2,8 +2,11 @@
 ReID instance to re identify basketball players detected between video frames.
 """
 
+from collections import defaultdict
+
 import numpy as np
 import torch
+from PIL import Image
 
 from .reid_model.image_clip import ImageClip
 from .utils import get_matches_from_reranked_distance_mat, pairwise_distance, re_ranking
@@ -35,6 +38,7 @@ class ReID:
 
         # Initialize tracklets, a dictionary to store the features of detected basketball players.
         self.tracklets: dict[int, torch.Tensor] = {}
+        self.tracklet_images: dict[int, list[Image.Image]] = defaultdict(list)
 
     def setup_tracklet(self, images: list[torch.Tensor]) -> None:
         """
@@ -67,6 +71,27 @@ class ReID:
         with torch.no_grad():
             image = image.to(self.device)
             self.tracklets[len(self.tracklets)] = self.model(image).detach().cpu()
+
+    def update_tracklet_images(
+        self, best_matches: dict[int, int], images: list[Image.Image]
+    ) -> None:
+        """
+        Update the tracklet images.
+
+        Args:
+            best_matches (dict[int, int]): Best matches. Key is the index of the query image and value is the index of the gallery image.
+            images (list[Image.Image]): Images of the gallery images.
+
+        Returns:
+            None
+        """
+        for query_idx, gallery_idx in best_matches.items():
+            self.tracklet_images[query_idx].append(images[gallery_idx])
+
+        if len(images) > len(self.tracklets) and len(self.tracklets) < 10:
+            for i in range(len(images)):
+                if i not in best_matches.values():
+                    self.tracklet_images[i].append(images[i])
 
     def update_tracklet(
         self, best_matches: dict[int, int], gallery_features: torch.Tensor

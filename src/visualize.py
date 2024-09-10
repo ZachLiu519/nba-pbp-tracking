@@ -5,6 +5,7 @@ Visualizer instance to plot the locations of the basketball players on the court
 import cv2
 import numpy as np
 import torch
+from PIL import Image
 from torchvision import transforms
 from tqdm import tqdm
 
@@ -113,25 +114,30 @@ class Visualizer:
                     torch.where(
                         self.tracker.model_results.boxes.cls == 0
                     )  # 0 is the class label for players
-                ]
-                .cpu()
-                .numpy(),
-                preprocess=self.reid_preprocess,
+                ].numpy(),
             )
+            detected_player_images_PIL = [image for image in detected_player_images]
+            preprocessed_images = [
+                self.reid_preprocess(image).unsqueeze(0)
+                for image in detected_player_images
+            ]
 
             if i == 0:
-                self.reid.setup_tracklet(images=detected_player_images)
+                self.reid.setup_tracklet(images=preprocessed_images)
                 self.tracker.set_positions_cache(positions=positions)
             else:
                 position_distance_matrix = self.tracker.get_position_distance_matrix(
                     current_positions=positions
                 )
                 best_matches, gallery_features = self.reid.reidentify(
-                    images=detected_player_images,
+                    images=preprocessed_images,
                     position_distance_matrix=position_distance_matrix,
                 )
                 self.reid.update_tracklet(
                     best_matches=best_matches, gallery_features=gallery_features
+                )
+                self.reid.update_tracklet_images(
+                    best_matches=best_matches, images=detected_player_images_PIL
                 )
                 self.tracker.update_positions_cache(
                     best_matches=best_matches, new_positions=positions
