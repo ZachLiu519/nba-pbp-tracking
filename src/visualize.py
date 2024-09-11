@@ -73,7 +73,7 @@ class Visualizer:
             ]
         )
 
-    def __call__(self, video_path: str, output_path: str) -> None:
+    def __call__(self, video_path: str, output_flag: bool, output_path: str) -> None:
         """
         Plot the locations of the basketball players on the court and track their identities, then save the output video.
 
@@ -143,28 +143,9 @@ class Visualizer:
                     best_matches=best_matches, new_positions=positions
                 )
 
-            for idx, point in enumerate(projected_positions):
-                if i == 0:
-                    cv2.circle(
-                        full_court_image_to_plot,
-                        tuple(map(int, point)),
-                        10,
-                        (0, 255, 0),
-                        -1,
-                    )
-                    cv2.putText(
-                        full_court_image_to_plot,
-                        str(idx),
-                        (int(point[0]) + 10, int(point[1]) - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        1,
-                        (0, 128, 255),
-                        2,
-                        cv2.LINE_AA,
-                    )
-                else:
-                    gallery_to_query = {v: k for k, v in best_matches.items()}
-                    if idx in gallery_to_query:
+            if output_flag:
+                for idx, point in enumerate(projected_positions):
+                    if i == 0:
                         cv2.circle(
                             full_court_image_to_plot,
                             tuple(map(int, point)),
@@ -174,7 +155,7 @@ class Visualizer:
                         )
                         cv2.putText(
                             full_court_image_to_plot,
-                            str(gallery_to_query[idx]),
+                            str(idx),
                             (int(point[0]) + 10, int(point[1]) - 10),
                             cv2.FONT_HERSHEY_SIMPLEX,
                             1,
@@ -182,8 +163,28 @@ class Visualizer:
                             2,
                             cv2.LINE_AA,
                         )
+                    else:
+                        gallery_to_query = {v: k for k, v in best_matches.items()}
+                        if idx in gallery_to_query:
+                            cv2.circle(
+                                full_court_image_to_plot,
+                                tuple(map(int, point)),
+                                10,
+                                (0, 255, 0),
+                                -1,
+                            )
+                            cv2.putText(
+                                full_court_image_to_plot,
+                                str(gallery_to_query[idx]),
+                                (int(point[0]) + 10, int(point[1]) - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                1,
+                                (0, 128, 255),
+                                2,
+                                cv2.LINE_AA,
+                            )
 
-            out.write(full_court_image_to_plot)
+                out.write(full_court_image_to_plot)
 
         cap.release()
         out.release()
