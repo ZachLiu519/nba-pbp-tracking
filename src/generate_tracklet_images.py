@@ -1,5 +1,4 @@
 import argparse
-
 import os
 
 from .visualize import Visualizer
@@ -27,7 +26,7 @@ def main(videos_folder_path: str):
         for player_idx, player_images in visualizer.reid.tracklet_images.items():
             for i, tracklet_image in enumerate(player_images):
                 tracklet_image.save(
-                    f"nba-pbp-tracking/src/videos/images/{video_name.split(".")[0]}_tracklet_images/player_{player_idx}_tracklet_{i}.png"
+                    f"nba-pbp-tracking/src/videos/images/{video_name.split('.')[0]}_tracklet_images/player_{player_idx}_tracklet_{i}.png"
                 )
 
 
