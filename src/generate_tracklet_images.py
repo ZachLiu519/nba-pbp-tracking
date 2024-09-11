@@ -1,9 +1,11 @@
 import argparse
 
+import os
+
 from .visualize import Visualizer
 
 
-def main(video_path: str):
+def main(videos_folder_path: str):
     visualizer = Visualizer(
         court_image_path="nba-pbp-tracking/src/assets/images/court.png",
         mapper_weights_path="nba-pbp-tracking/src/model_weights/best_resnet18.pth",
@@ -13,24 +15,24 @@ def main(video_path: str):
         reid_weights_path="nba-pbp-tracking/src/model_weights/best_clip.pth",
     )
 
-    visualizer(
-        video_path=video_path,
-        output_flag=False,  # Set to False to disable video output
-        output_path="",
-    )
+    for video_name in os.listdir(videos_folder_path):
 
-    video_name = video_path.split("/")[-1].split(".")[0]
+        visualizer(
+            video_path=os.path.join(videos_folder_path, video_name),
+            output_flag=False,  # Set to False to disable video output
+            output_path="",
+        )
 
-    # Save all players' tracklets images to disk
-    for player_idx, player_images in visualizer.reid.tracklet_images.items():
-        for i, tracklet_image in enumerate(player_images):
-            tracklet_image.save(
-                f"nba-pbp-tracking/src/assets/images/{video_name}_tracklet_images/player_{player_idx}_tracklet_{i}.png"
-            )
+        # Save all players' tracklets images to disk
+        for player_idx, player_images in visualizer.reid.tracklet_images.items():
+            for i, tracklet_image in enumerate(player_images):
+                tracklet_image.save(
+                    f"nba-pbp-tracking/src/videos/images/{video_name.split(".")[0]}_tracklet_images/player_{player_idx}_tracklet_{i}.png"
+                )
 
 
 if __name__ == "__main__":
     argParser = argparse.ArgumentParser()
-    argParser.add_argument("--video_path", type=str, required=True)
+    argParser.add_argument("--videos_folder_path", type=str, required=True)
     args = argParser.parse_args()
-    main(video_path=args.video_path)
+    main(videos_folder_path=args.videos_folder_path)

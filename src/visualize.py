@@ -97,75 +97,58 @@ class Visualizer:
         )
 
         for i in tqdm(range(num_frames)):
-            full_court_image_to_plot = self.full_court_image.copy()
+            if i % 5 == 0:
+                full_court_image_to_plot = self.full_court_image.copy()
 
-            ret, frame = cap.read()
-            if not ret:
-                break
+                ret, frame = cap.read()
+                if not ret:
+                    break
 
-            homography_matrix = self.mapper(frame)
-            positions = self.tracker(frame)
-            projected_positions = cv2.perspectiveTransform(
-                np.array([positions], dtype=np.float32), homography_matrix
-            )[0]
-            detected_player_images = crop_bbox_from_image(
-                image=frame,
-                bboxes=self.tracker.model_results.boxes.xyxy[
-                    torch.where(
-                        self.tracker.model_results.boxes.cls == 0
-                    )  # 0 is the class label for players
-                ].numpy(),
-            )
-            detected_player_images_PIL = [image for image in detected_player_images]
-            preprocessed_images = [
-                self.reid_preprocess(image).unsqueeze(0)
-                for image in detected_player_images
-            ]
+                homography_matrix = self.mapper(frame)
+                positions = self.tracker(frame)
+                projected_positions = cv2.perspectiveTransform(
+                    np.array([positions], dtype=np.float32), homography_matrix
+                )[0]
+                detected_player_images = crop_bbox_from_image(
+                    image=frame,
+                    bboxes=self.tracker.model_results.boxes.xyxy[
+                        torch.where(
+                            self.tracker.model_results.boxes.cls == 0
+                        )  # 0 is the class label for players
+                    ].numpy(),
+                )
+                detected_player_images_PIL = [image for image in detected_player_images]
+                preprocessed_images = [
+                    self.reid_preprocess(image).unsqueeze(0)
+                    for image in detected_player_images
+                ]
 
-            if i == 0:
-                self.reid.setup_tracklet(images=preprocessed_images)
-                self.tracker.set_positions_cache(positions=positions)
-            else:
-                position_distance_matrix = self.tracker.get_position_distance_matrix(
-                    current_positions=positions
-                )
-                best_matches, gallery_features = self.reid.reidentify(
-                    images=preprocessed_images,
-                    position_distance_matrix=position_distance_matrix,
-                )
-                self.reid.update_tracklet(
-                    best_matches=best_matches, gallery_features=gallery_features
-                )
-                self.reid.update_tracklet_images(
-                    best_matches=best_matches, images=detected_player_images_PIL
-                )
-                self.tracker.update_positions_cache(
-                    best_matches=best_matches, new_positions=positions
-                )
-
-            if output_flag:
-                for idx, point in enumerate(projected_positions):
-                    if i == 0:
-                        cv2.circle(
-                            full_court_image_to_plot,
-                            tuple(map(int, point)),
-                            10,
-                            (0, 255, 0),
-                            -1,
+                if i == 0:
+                    self.reid.setup_tracklet(images=preprocessed_images)
+                    self.tracker.set_positions_cache(positions=positions)
+                else:
+                    position_distance_matrix = (
+                        self.tracker.get_position_distance_matrix(
+                            current_positions=positions
                         )
-                        cv2.putText(
-                            full_court_image_to_plot,
-                            str(idx),
-                            (int(point[0]) + 10, int(point[1]) - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            1,
-                            (0, 128, 255),
-                            2,
-                            cv2.LINE_AA,
-                        )
-                    else:
-                        gallery_to_query = {v: k for k, v in best_matches.items()}
-                        if idx in gallery_to_query:
+                    )
+                    best_matches, gallery_features = self.reid.reidentify(
+                        images=preprocessed_images,
+                        position_distance_matrix=position_distance_matrix,
+                    )
+                    self.reid.update_tracklet(
+                        best_matches=best_matches, gallery_features=gallery_features
+                    )
+                    self.reid.update_tracklet_images(
+                        best_matches=best_matches, images=detected_player_images_PIL
+                    )
+                    self.tracker.update_positions_cache(
+                        best_matches=best_matches, new_positions=positions
+                    )
+
+                if output_flag:
+                    for idx, point in enumerate(projected_positions):
+                        if i == 0:
                             cv2.circle(
                                 full_court_image_to_plot,
                                 tuple(map(int, point)),
@@ -175,7 +158,7 @@ class Visualizer:
                             )
                             cv2.putText(
                                 full_court_image_to_plot,
-                                str(gallery_to_query[idx]),
+                                str(idx),
                                 (int(point[0]) + 10, int(point[1]) - 10),
                                 cv2.FONT_HERSHEY_SIMPLEX,
                                 1,
@@ -183,8 +166,28 @@ class Visualizer:
                                 2,
                                 cv2.LINE_AA,
                             )
+                        else:
+                            gallery_to_query = {v: k for k, v in best_matches.items()}
+                            if idx in gallery_to_query:
+                                cv2.circle(
+                                    full_court_image_to_plot,
+                                    tuple(map(int, point)),
+                                    10,
+                                    (0, 255, 0),
+                                    -1,
+                                )
+                                cv2.putText(
+                                    full_court_image_to_plot,
+                                    str(gallery_to_query[idx]),
+                                    (int(point[0]) + 10, int(point[1]) - 10),
+                                    cv2.FONT_HERSHEY_SIMPLEX,
+                                    1,
+                                    (0, 128, 255),
+                                    2,
+                                    cv2.LINE_AA,
+                                )
 
-                out.write(full_court_image_to_plot)
+                    out.write(full_court_image_to_plot)
 
         cap.release()
         out.release()
