@@ -17,3 +17,15 @@ pip install -r requirements.txt
 
 ## Usage
 
+### Tracking video generation
+
+Download mapper weights, tracker weights and reid model weights from release. Navigate to `src/visualize.py`. Use `src/assets/images/court.png` or your favorite court image in argument `court_image_path`.
+
+## Credits
+
+- https://github.com/DeepSportradar/2022-winners-camera-calibration-challenge
+- https://github.com/DeepSportradar/2022-winners-player-reidentification-challenge
+
+## License
+
+The project is licensed under the MIT License. See [LICENSE](.github/LICENSE) for more information.
